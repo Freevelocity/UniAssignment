@@ -1,0 +1,462 @@
+sDirPath='/Users/mohammedusmaan/MWPower/';  
+colFilesData = ReadDirectry(sDirPath);
+ 
+for iColFileCnt = 1:length(colFilesData)
+  
+    EveryFile = colFilesData{1,iColFileCnt}
+    [RowEveryfile, ColEveryfile] = size(EveryFile)
+    AllB_field(iColFileCnt,1) = EveryFile(1,4)
+    AllVoltage{1,iColFileCnt} = EveryFile(:,1)
+    AllCurrent{1,iColFileCnt} = EveryFile(:,2)
+    AllDIDV{1,iColFileCnt} = EveryFile(:,3)
+  
+end
+%%%%% Initialize Peak Length Data %%%%%%%%%
+iPeakLens=zeros(iColFileCnt,4);
+%Min Peak Height
+iMinPksHgt=1.09;%1.215;%1.3;
+%Min Peak Distance
+iMinPksDist=35;%35;
+%Min Peaks Prominence
+iMinPksProm= 0.00515;%0.01915;%0.01;%0.00515;%
+ 
+%First Min Peak tolerance level
+iMinPksPromClsTol=0.00515;
+%Second Min Peak tolerance level
+iMinPksPromClsTol2=0.001515;
+%First Min Height tolerance level
+iMinPksHgtClsTol=1.2;
+%Second Min Height tolerance level
+iMinPksDistClsTol=50;
+%%%%% End Initialize Peak Length Data %%%%%%
+ 
+%%%%%% Testing Initialize Data %%%%%%%%
+   for iCnt=1:iColFileCnt
+    % File data number
+    iFileNum=iCnt;
+    %output plot
+    iOutputPlot=0;
+    %voltage refs
+    iVoltsRefs=AllVoltage{1,iFileNum};
+    %Current Refs
+    iCurrentRefs=AllCurrent{1,iFileNum}
+   
+    iDoMinPksEval=0;
+    %%%%%% End Testing Initialize Data %%%%%%%%
+ 
+    [imaxPks,imaxLocs,imaxWidth,iMaxProm,iCalDiDvData]=EvaluateDataForPeaks(iVoltsRefs,iCurrentRefs,iMinPksHgt,iMinPksDist,iOutputPlot);
+     iMinPeakData=EvaluateMinPeaks(imaxPks,imaxLocs,iCalDiDvData,iMinPksProm,iVoltsRefs,iDoMinPksEval,iOutputPlot);
+     if iMinPeakData(1)>0
+         iPeakLens=EvaluatePeaksLengths(iFileNum,iMinPeakData,imaxPks,imaxLocs,iVoltsRefs,iPeakLens);
+     end
+   
+ 
+   end
+ 
+   
+CalDIDV = gradient(AllCurrent{1,1})./gradient(AllVoltage{1,1})
+SCalDIDV = smooth(CalDIDV,10)
+% plot(AllVoltage{1,i},SCalDIDV,'k-')
+% hold on
+% plot(AllVoltage{1,i},AllDIDV{1,i},'b-')
+% xlabel('Voltage')
+% ylabel('dI/dV (1/\Omega)')
+% ylim([-4 4])
+% title('Calculated dI/dV and Measured dI/dV aganist Voltage')
+ 
+ 
+[pks,locs,w,p] = findpeaks(SCalDIDV,'MinPeakHeight',1.09 ,'MinPeakDistance',30);     % Anything below 1.2 gets cut off. 
+% 
+iRotDatapnts=   -SCalDIDV 
+[minPks,minLocs,minW,minP] = findpeaks(iRotDatapnts,'MinPeakHeight',-1.4 ,'MinPeakDistance',30);
+%  
+%  
+%plot(AllVoltage{1,1},iRotDatapnts,'ko')
+%  
+ 
+ 
+plot(AllVoltage{1,1},SCalDIDV,'ko')
+ hold on
+ plot(AllVoltage{1,1}(locs),pks,'ro')
+% xlabel('Voltage')
+% ylabel('dI/dV (1/\Omega)')
+% title('dI/dV aganist voltage for the 1st set of data with the max peaks')
+ %hold on 
+%plot(AllVoltage{1,1},iRotDatapnts,'ko')
+%hold on 
+%plot(AllVoltage{1,1}(minLocs),minPks,'go')
+ylim([0 2])
+xlabel('Voltage')
+ylabel('dI/dV (1/\Omega')
+title('dI/dV and aganist Voltage for the 1st set of data with max points')
+legend('Data points','Min values')
+   
+   
+   
+%  NH2 = iPeakLens(:,1)
+%  NH1 = iPeakLens(:,2)
+%  PH1 = iPeakLens(:,3)
+%  PH2 = iPeakLens(:,4)
+%  
+% DiffH = ((PH2 - NH2)/PH2)*100
+% DiffH1 = ((PH1 - NH1)/PH1)*100
+% 
+% figure (1)
+%  plot(AllB_field,DiffH,'k-')
+%  xlabel('B-Field (mT)')
+%  ylabel('Percentage')
+%  title('Difference of height between the 2nd positive Shapiro step and 2nd Negative Shaprio step')
+%  figure (2)
+%  plot(AllB_field,DiffH1,'k-')
+%  xlabel('B-Field (mT)')
+%  ylabel('Percentage')
+%  title('Difference in height between the 1st positive Shapiro step and 1st negative Shapiro step')
+%  
+% % 
+%  figure (1)
+%  plot(AllB_field,NH2,'k-')
+%  xlabel('B-Field (mT)')
+%  ylabel('dI/dV (1/\Omega)')
+%  title('Height of second negative peak aganist B-field (2nd Negative Shapiro Step)')
+%  figure (2)
+%  plot(AllB_field,NH1,'k-')
+%  xlabel('B-Field (mT)')
+%  ylabel('dI/dV (1/\Omega)')
+%  title('Height of first negative peak aganist B-field (1st Negative Shapiro Step)')
+%  figure (3)
+%  plot(AllB_field,PH1,'k-')
+%  xlabel('B-Field (mT)')
+%  ylabel('dI/dV (1/\Omega)')
+%  title('Height of first positive peak aganist B-field (1st Positive Shapiro Step)')
+%  figure (4)
+%  plot(AllB_field,PH2,'k-')
+%  xlabel('B-Field (mT)')
+%  ylabel('dI/dV (1/\Omega)')
+%  title('Height of second positive peak aganist B-field (2nd Positive Shapiro Step)')
+ 
+ 
+%%%%%% Functions Declarations %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+ 
+function PeakLensData=EvaluatePeaksLengths(pFileNum,pMinPksData,pMaxPksData,pMaxLocs,pVoltsRef,pPeakLens)
+       
+        PntsB4Zero=0;
+        PntsA4Zero=0;
+        [PntsB4Zero,PntsA4Zero]=EvaluateMaxPeaksPostions(pMaxPksData,pMaxLocs,pVoltsRef);
+       
+        iSizeB4Pnts=0;
+        for iNumNeg=1:length(PntsB4Zero)
+            if PntsB4Zero(iNumNeg,2)>0
+                iSizeB4Pnts=iSizeB4Pnts+1;
+ 
+            end
+        end
+        iSizeA4Pnts=0;
+        for iNumPos=1:length(PntsA4Zero)
+            if PntsA4Zero(iNumPos,2)>0
+                iSizeA4Pnts=iSizeA4Pnts+1;
+ 
+            end
+        end
+        iTotalPnt=iSizeB4Pnts+iSizeA4Pnts;
+       
+        iSizeMinPks=length(pMinPksData);
+        iSizeMaxPks=length(pMaxPksData);
+        iMinPntRq=iSizeMaxPks+1;
+      
+        
+        %Min to Point to skip
+        iSkipPoint=0;
+        if iSizeMaxPks==3
+            iSkipPoint=2;
+        elseif iSizeMaxPks==4
+            iSkipPoint=3;
+        elseif iSizeMaxPks==5 || iSizeMaxPks==6
+           iSkipPoint=4;
+        end
+       
+        iNegPntsUsed=0;
+        iPosPntsUsed=0;
+        iPntsProcessed=0;
+        iStrtPos=1;
+        if iSizeMinPks>=iTotalPnt
+            %length of the negative point
+            if iSizeB4Pnts>=3
+                 iNegPntsUsed=2;
+                 iStrtPos=2;
+                for iNegPnts=1:iNegPntsUsed
+                    iMinPnt=pMinPksData(iStrtPos);
+                    iMaxPnt=pMaxPksData(iStrtPos);
+                    iPntsProcessed=iPntsProcessed+1;
+                     pPeakLens(pFileNum,iPntsProcessed)=iMaxPnt-iMinPnt;
+                    iStrtPos=iStrtPos+1;
+                end
+            else
+                for iNegPnts=1:iSizeB4Pnts
+                    iMinPnt=pMinPksData(iNegPnts);
+                    iMaxPnt=pMaxPksData(iNegPnts);
+                    iPntsProcessed=iPntsProcessed+1;
+                    pPeakLens(pFileNum,iPntsProcessed)=iMaxPnt-iMinPnt;
+                   
+                end
+            end
+            if iPntsProcessed<2
+                iPntsProcessed=iPntsProcessed+1;
+            end
+            if iSizeA4Pnts>=3
+                iPosPntsUsed=2;
+                for iPosPnts=1:iPosPntsUsed
+                    iMaxLoc=PntsA4Zero(iPosPnts+1,2);
+                        %iMinPnt=pMinPksData(iSkipPoint+iPosPnts);
+                        iMinPnt=pMinPksData(iMaxLoc+1);
+                        iMaxPnt=pMaxPksData(iMaxLoc);
+                    iPntsProcessed=iPntsProcessed+1;
+                    pPeakLens(pFileNum,iPntsProcessed)=iMaxPnt-iMinPnt;
+                end
+            else
+                if iSizeA4Pnts==1
+                   
+                    iMaxLoc=PntsA4Zero(iSizeA4Pnts,2);
+              
+                        iMinPnt=pMinPksData(iSizeMinPks);
+                        iMaxPnt=pMaxPksData(iMaxLoc);
+               
+                    iPntsProcessed=iPntsProcessed+1;
+                    pPeakLens(pFileNum,iPntsProcessed)=iMaxPnt-iMinPnt;
+               
+                    
+                else
+                    for iPosPnts=1:iSizeA4Pnts
+                        iMaxLoc=PntsA4Zero(iPosPnts,2);
+ 
+                            %iMinPnt=pMinPksData(iSkipPoint+iPosPnts)
+                            iMinPnt=pMinPksData(iMaxLoc+1);
+                            iMaxPnt=pMaxPksData(iMaxLoc);
+ 
+                        iPntsProcessed=iPntsProcessed+1;
+                        pPeakLens(pFileNum,iPntsProcessed)=iMaxPnt-iMinPnt;
+                    end
+                end
+            end
+ 
+        end
+        PeakLensData=pPeakLens;
+end
+ 
+ 
+function minPksData=EvaluateMinPeaks(pMaxPksData,pMaxLocs,pCalDifData,pMPP,pVoltsRef,pDoMinPointEval,pOutputPlot)
+ 
+ 
+    % Point zone area from max peak points
+    % to to determine what min points to remove.
+    iPntZoneFrmMax=15;
+   
+    %Close point to max peaks tolerance
+    iClosetPointTol=0.04;
+   
+    %Min peaks close tolerance
+    iMinPksCloseTol=0.065;
+ 
+    % determining the number of max peak points
+    iSizePks=length(pMaxPksData);
+    iSizeLocs=length(pMaxLocs);
+    % Number of min points required
+    iMinPntRq=iSizePks+1;
+   
+    % Rotate the max points
+    iRotDatapnts=-pCalDifData
+ 
+    % Find the min peaks with tolerance 01915 - 0.03115 -- This may require further
+    % tweeking on overall files. These tolerance produce min peak point from 11 to 7
+    % points
+    [minPks,minLocs,minW,minP] = findpeaks(iRotDatapnts,'MinPeakProminence',pMPP);
+   
+    % Rotate the new max points ==> minPks
+    rotMinPksData=minPks;
+    iRotMinPks=-minPks;
+    minPeaksPnts= iRotMinPks;
+    minPeakLoc=minLocs;
+    % determining the number of min peak points
+    iSizeMinPks=length(iRotMinPks);
+    iSizeMinLocs=length(minLocs);
+ 
+    % Nnumber of elements to be removed
+    iElemToRemove=0;
+   
+    %Close Tolerance element to remove
+    iClsTolElm=1;
+ 
+    % iRemove Element flag
+    iRemoveElemFlag=0;
+ 
+    % To Min peak elements processed
+    iMinElemProcessed=0;
+ 
+    % storing positions of the reduntant min peaks
+    iMinPeaksRemoved=zeros(iSizeMinPks,1);
+  
+    iNxtStrtCnt=0;
+    %remove closet points to max peaks
+       
+    iMinLocChksVal=4;
+   
+    % check number of new max points evaluated by findpeak function
+    % are they greater than min points required.
+    try
+    if iSizeMinPks>iMinPntRq
+   
+        %remove closet points to max peaks
+        for iClstPnt=1:iMinPntRq
+            if iClsTolElm>0
+              if iClstPnt<=iSizeLocs
+                    iTmpMaxPk=pMaxLocs(iClstPnt);
+                    for iChkMinPnt=1:iSizeMinLocs
+                        if iChkMinPnt>iMinElemProcessed
+                            iTmpMinPk=minLocs(iChkMinPnt);
+                            if iTmpMinPk>iTmpMaxPk
+                             
+                                for iMinLocVal=1:iMinLocChksVal
+                                    iNewLocChk=iChkMinPnt-iMinLocVal;
+                                      if iNewLocChk>iMinElemProcessed
+                                         iNwTmpMinPk=minLocs(iNewLocChk);
+                                        iNewVldPnt=iTmpMaxPk-iNwTmpMinPk;
+                                        if iNewVldPnt>=iPntZoneFrmMax
+                                            iMinPeaksRemoved(iNewLocChk)=0;
+                                            break;
+                                        end 
+                                      else
+                                          iMinPeaksRemoved(iChkMinPnt-1)=0;
+                                          break
+                                      end 
+                                    
+                                end
+                               
+                                 iMinElemProcessed=iMinElemProcessed+1;
+                            
+                                 iRemoveElemFlag=1;
+                                 break;
+                            else
+                                iMinPeaksRemoved(iChkMinPnt)=iChkMinPnt;
+                                iRemoveElemFlag=1;
+                            end
+                        end
+                    end
+              else
+                for iChkMinPnt=1:iSizeMinLocs
+                    if iChkMinPnt>iMinPntRq
+                        iMinPeaksRemoved(iChkMinPnt)=iChkMinPnt;
+                        iRemoveElemFlag=1;
+                    end
+                end
+              end
+                % re-evaluate the number of elements
+                if iRemoveElemFlag>0
+                    % Entry point flag for removal min peak point
+                    iMinPkEntryFlag=0;
+                    for iRemovePnt=1:length(iMinPeaksRemoved)
+                       iTmpPntRm=iMinPeaksRemoved(iRemovePnt);
+                       if iTmpPntRm>0
+                           if iMinPkEntryFlag ==0
+                                iRotMinPks(iTmpPntRm)=[];
+                                minLocs(iTmpPntRm)=[];
+                                iMinPkEntryFlag=1;
+                           else
+                                iRotMinPks(iTmpPntRm-iMinPkEntryFlag)=[];
+                                minLocs(iTmpPntRm-iMinPkEntryFlag)=[];
+                                iMinPkEntryFlag=iMinPkEntryFlag+1;
+                           end
+                            iSizeMinPks=length(iRotMinPks);
+                            iSizeMinLocs=length(minLocs);
+                            iMinPeaksRemoved(iRemovePnt)=0; 
+                       end
+                    end
+                    iRemoveElemFlag=0;
+                end
+            end
+        end
+       
+    end
+   
+    if pOutputPlot==1
+        % %plot the rotated data
+        plot(pVoltsRef(minLocs),iRotMinPks,'go');
+        hold on;
+    end
+    catch ME
+        iRotMinPks(1)=0;
+    end
+    minPksData=iRotMinPks;
+    
+end
+ 
+function [PntsB4Zero,PntsA4Zero]=EvaluateMaxPeaksPostions(pMaxPksData,pMaxLocs,pVoltsRef)
+ 
+ 
+   
+    iSizeMaxPks=length(pMaxPksData);
+    iPntb4zero=zeros(iSizeMaxPks,2);
+    iPntA4zero=zeros(iSizeMaxPks,2);
+    iTmpX=0;
+    iZeroPnt=0.0000;
+    iB4Cnt=1;
+    iA4Cnt=1;
+    for iSrchPnt=1:iSizeMaxPks
+        iTmpX=pVoltsRef(pMaxLocs(iSrchPnt));
+        iRndVal=round(iTmpX,4);
+        if  iRndVal== iZeroPnt
+            %do nothing;
+        elseif iTmpX>iZeroPnt
+            iPntA4zero(iA4Cnt,1)=iTmpX;
+            iPntA4zero(iA4Cnt,2)=iSrchPnt;
+            iA4Cnt=iA4Cnt+1;
+        else
+            iPntb4zero(iB4Cnt,1)=iTmpX;
+            iPntb4zero(iB4Cnt,2)=iSrchPnt;
+            iB4Cnt=iB4Cnt+1;
+        end
+    end
+    PntsB4Zero=iPntb4zero;
+    PntsA4Zero=iPntA4zero;
+end
+ 
+ 
+ 
+ 
+ 
+function [maxPks,maxLocs,maxWidth,MaxProm,sCalDiDvData]=EvaluateDataForPeaks(pVoltRefs,pCurrentRefs, pMPH,pMPD,pOutputPlot)
+   
+    CalDIDV = gradient(pCurrentRefs)./gradient(pVoltRefs);
+    SCalDIDV = smooth(CalDIDV,10);
+    [pks,locs,w,p] = findpeaks(SCalDIDV,'MinPeakHeight',pMPH ,'MinPeakDistance',pMPD);     % Anything below 1.2 gets cut off.
+    if pOutputPlot== 1
+         plot(pVoltRefs,SCalDIDV,'ro');
+        hold on;
+        plot(pVoltRefs(locs),pks,'co');
+    end
+    maxPks=pks;
+    maxLocs=locs;
+    maxWidth=w;
+    MaxProm=p;
+    sCalDiDvData=SCalDIDV;
+   
+end
+%%%%%% End Functions Declarations %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+ 
+ 
+function FilesData = ReadDirectry(pDirPath)     % Function remains at bottom
+   iRowCnt=0;
+    sAllFiles='*.*';
+    lstFiles=dir(sprintf('%s%s',pDirPath,sAllFiles));
+    szFiles=size(lstFiles);
+    colFileData= cell(szFiles-2);
+    for iCnt=1:szFiles
+        if iCnt>2
+            iRowCnt=iRowCnt+1;
+            sFileNames=lstFiles(iCnt).name;
+            sFilePath=lstFiles(iCnt).folder;
+            sFilepath_Filename=sprintf('%s//%s',sFilePath,sFileNames);
+            colFileData{iRowCnt} = load(sFilepath_Filename);
+        end
+    end
+    FilesData = colFileData;
+  
+end
